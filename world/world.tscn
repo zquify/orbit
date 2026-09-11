@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://biriwn23m61yg"]
 
-[ext_resource type="Script" uid="uid://dx7bd7opkc1k3" path="res://ui/hud.gd" id="1_15vp1"]
-[ext_resource type="Texture2D" uid="uid://ce5s155keb00v" path="res://textures/crosshair_big.png" id="2_15vp1"]
-[ext_resource type="Texture2D" uid="uid://diqe1j8anugxe" path="res://textures/crosshair_small.png" id="3_3fev5"]
-[ext_resource type="PackedScene" uid="uid://cpr5t4paix2ua" path="res://game/player/player.tscn" id="4_3fev5"]
+[ext_resource type="Script" uid="uid://dx7bd7opkc1k3" path="res://ui/hud.gd" id="1_h5o24"]
+[ext_resource type="Script" uid="uid://cpcokoif084bl" path="res://world/world.gd" id="1_mmdvd"]
+[ext_resource type="Texture2D" uid="uid://ce5s155keb00v" path="res://textures/crosshair_big.png" id="2_mmdvd"]
+[ext_resource type="Texture2D" uid="uid://diqe1j8anugxe" path="res://textures/crosshair_small.png" id="3_fn3g3"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ye4v7"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -33,7 +33,7 @@ rings = 64
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("2_15vp1")
+"texture": ExtResource("2_mmdvd")
 }],
 "loop": 1,
 "name": &"big",
@@ -41,14 +41,15 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("3_3fev5")
+"texture": ExtResource("3_fn3g3")
 }],
 "loop": 1,
 "name": &"small",
 "speed": 5.0
 }]
 
-[node name="Blockout" type="Node3D" unique_id=662205846]
+[node name="World" type="Node3D" unique_id=662205846]
+script = ExtResource("1_mmdvd")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=25630490]
 transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
@@ -93,20 +94,41 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.3874874, -15.893433, 14.766
 transform = Transform3D(1, 0, 0, 0, 0.82227176, 0.569095, 0, -0.569095, 0.82227176, 0, 14.971064, -4.3246517)
 use_collision = true
 
-[node name="CenterContainer" type="CenterContainer" parent="." unique_id=1507759863]
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
+[node name="HUD" type="Control" parent="." unique_id=1568534031]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_15vp1")
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+script = ExtResource("1_h5o24")
 
-[node name="Crosshair" type="AnimatedSprite2D" parent="CenterContainer" unique_id=2090361019]
+[node name="Crosshair" type="AnimatedSprite2D" parent="HUD" unique_id=2090361019]
+position = Vector2(959.5, 528.5)
 scale = Vector2(0.5, 0.5)
 sprite_frames = SubResource("SpriteFrames_g4v7s")
 animation = &"big"
 
-[node name="Player" parent="." unique_id=1451404521 instance=ExtResource("4_3fev5")]
+[node name="RoomCode" type="Label" parent="HUD" unique_id=693810456]
+layout_mode = 1
+offset_left = 40.0
+offset_top = 40.0
+offset_right = 95.0
+offset_bottom = 63.0
+text = "ROOM5"
+
+[node name="Players" type="Node3D" parent="." unique_id=1868008137]
+
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=808951362]
+spawn_path = NodePath("../Players")
+
+[node name="SpawnPoints" type="Node3D" parent="." unique_id=2128371179]
+
+[node name="Spawn1" type="Marker3D" parent="SpawnPoints" unique_id=1246889751]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
+
+[node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=347363310]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.999109, 11.127246, 1.1921334)

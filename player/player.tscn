@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cpr5t4paix2ua"]
 
-[ext_resource type="Script" uid="uid://qq2vcwapadnm" path="res://game/player/player.gd" id="1_onrkg"]
-[ext_resource type="Script" uid="uid://br4sno68x2gl8" path="res://game/player/camera.gd" id="2_i3pqv"]
+[ext_resource type="Script" uid="uid://qq2vcwapadnm" path="res://player/player.gd" id="1_rkbax"]
+[ext_resource type="Script" uid="uid://br4sno68x2gl8" path="res://player/camera.gd" id="2_g1dw6"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_g4v7s"]
 radius = 0.4
@@ -17,9 +17,17 @@ height = 1.8
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ye4v7"]
 albedo_color = Color(0, 0, 0, 1)
 
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_rkbax"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:rotation")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+
 [node name="Player" type="CharacterBody3D" unique_id=1451404521]
 floor_snap_length = 0.5
-script = ExtResource("1_onrkg")
+script = ExtResource("1_rkbax")
 
 [node name="CSGMesh3D" type="CSGMesh3D" parent="." unique_id=443665083]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
@@ -38,10 +46,11 @@ material = SubResource("StandardMaterial3D_ye4v7")
 [node name="CameraPivot" type="Node3D" parent="." unique_id=2134452884 node_paths=PackedStringArray("player", "camera_target")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 16.3, 0)
 top_level = true
-script = ExtResource("2_i3pqv")
+script = ExtResource("2_g1dw6")
 player = NodePath("..")
 camera_target = NodePath("../CameraTarget")
 zoom_speed = 13.0
+zoom_scale = Vector3(1, 1, 0.55)
 zoom_sensitivity_multiplier = 0.63
 
 [node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=417941655]
@@ -51,3 +60,6 @@ fov = 80.0
 
 [node name="CameraTarget" type="Node3D" parent="." unique_id=1994388317]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=2014163948]
+replication_config = SubResource("SceneReplicationConfig_rkbax")

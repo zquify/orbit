@@ -22,16 +22,12 @@ extends CharacterBody3D
 ## bodies, but the final gravity vector always has this magnitude.
 @export var gravity_strength: float = 32.0
 
-## Gravity bodies currently affecting the player.
+## Gravity bodies that can affect the player.
 ##
-## This array is populated automatically from the "gravity_body" group when
-## the player enters the scene.
+## Populated from the "gravity_body" group in _ready().
 var gravity_bodies: Array[Node3D] = []
 
-## Minimum squared vector length considered effectively zero.
-##
-## A small threshold is used because floating-point calculations can produce
-## very small values when a vector is mathematically expected to be zero.
+## Threshold for treating very small vectors as zero.
 const VECTOR_EPSILON_SQUARED: float = 0.0001
 
 #endregion
@@ -111,6 +107,17 @@ const VECTOR_EPSILON_SQUARED: float = 0.0001
 #region Initialization
 
 func _ready() -> void:
+	# Only the peer that owns this player should control its camera.
+	var local_player := is_multiplayer_authority()
+
+	camera_pivot.set_process(local_player)
+	camera_pivot.set_physics_process(local_player)
+
+	var camera := camera_pivot.get_node_or_null("Camera3D")
+
+	if camera:
+		camera.current = local_player
+
 	# Allow the CharacterBody3D to remain attached to nearby surfaces.
 	#
 	# This is especially useful for curved gravity because the floor may not
@@ -159,10 +166,13 @@ func _ready() -> void:
 ## 7. Apply camera rotation.
 ## 8. Move the CharacterBody3D.
 func _physics_process(delta: float) -> void:
+	if not is_multiplayer_authority():
+		return
+	
 	var gravity: Vector3 = calculate_gravity()
 
-	# Without a usable gravity vector, there is no meaningful local up direction.
-	# Let CharacterBody3D continue using its current velocity instead.
+	# Without gravity, we can't determine the player's up direction.
+	# Still move using the current velocity.
 	if gravity.length_squared() < VECTOR_EPSILON_SQUARED:
 		move_and_slide()
 		return
@@ -178,11 +188,10 @@ func _physics_process(delta: float) -> void:
 	handle_jump(gravity_up)
 	handle_launch()
 
-	# Gravity is applied after player input so jumping and launching can add
-	# their own velocity before gravity affects the result.
+	# Apply gravity after input so jumps and launches get their full initial velocity.
 	apply_gravity(gravity, delta)
 
-	# Gradually rotate the player's local Y axis toward the current up direction.
+	# Gradually rotate the player so its up direction matches gravity.
 	align_to_surface(gravity_up, delta)
 
 	# Apply horizontal camera rotation to the player.
@@ -208,10 +217,9 @@ func _physics_process(delta: float) -> void:
 
 ## Calculates the combined gravity vector produced by all gravity bodies.
 ##
-## Each gravity body contributes a direction pointing from the player toward
-## that body's origin. Its influence uses an inverse-square relationship:
-##
-##     weight = 1 / distance²
+## Each gravity body pulls toward its origin. Its influence decreases with
+## distance, with a minimum distance used to prevent extreme weights near
+## the center.
 ##
 ## This causes nearby gravity bodies to have more influence than distant ones.
 ##
@@ -244,8 +252,8 @@ func calculate_gravity() -> Vector3:
 		# Use inverse-square weighting so closer gravity bodies have greater
 		# influence.
 		#
-		# The minimum denominator prevents the weight from becoming extremely
-		# large when the player is very close to a gravity body's origin.
+		# Prevent very small distances from producing an extremely large weight
+		# when the player is very close to a gravity body's origin.
 		var weight: float = 1.0 / max(distance * distance, 1.0)
 
 		# Add this gravity body's weighted direction to the combined result.
@@ -339,7 +347,6 @@ func handle_movement(gravity_up: Vector3, delta: float) -> void:
 		# Convert the desired direction into the target surface velocity.
 		var target_velocity: Vector3 = move_direction * move_speed
 
-		# Gradually move the current surface velocity toward the target.
 		surface_velocity = surface_velocity.move_toward(
 			target_velocity,
 			acceleration * delta
@@ -428,10 +435,7 @@ func handle_launch() -> void:
 ## Rotating around gravity_up instead of global Y allows the player to rotate
 ## correctly while standing on curved or non-horizontal surfaces.
 func handle_camera_rotation(gravity_up: Vector3) -> void:
-	# camera.gd provides the consume_yaw() function.
-	#
-	# call() is used because camera_pivot is typed as Node3D rather than a
-	# custom camera script class.
+	# CameraPivot is typed as Node3D, so use call() to access consume_yaw().
 	var camera_yaw: float = camera_pivot.call("consume_yaw")
 
 	if abs(camera_yaw) < 0.000001:
@@ -460,21 +464,20 @@ func align_to_surface(gravity_up: Vector3, delta: float) -> void:
 	# The player's local Y axis represents its current up direction.
 	var current_up: Vector3 = current_basis.y
 
-	# The cross product gives the axis around which current_up needs to rotate
-	# to reach gravity_up.
+	# Find the axis we need to rotate around.
 	var rotation_axis: Vector3 = current_up.cross(gravity_up)
 
-	# If the directions are already aligned, no rotation is necessary.
+	# No rotation is needed when the two directions are parallel.
+	#
+	# Note: this also includes the 180-degree opposite case, where the cross
+	# product is zero.
 	if rotation_axis.length_squared() < VECTOR_EPSILON_SQUARED:
 		return
 
 	rotation_axis = rotation_axis.normalized()
 
-	# Calculate the angle between the current and desired up directions.
-	#
-	# The dot product gives the cosine of the angle between the vectors.
-	# clamp() protects acos() from tiny floating-point errors that could produce
-	# a value just outside its valid [-1, 1] range.
+	# Find the angle between the current and target up directions.
+	# Clamp the dot product to avoid floating-point errors with acos().
 	var angle: float = acos(
 		clamp(current_up.dot(gravity_up), -1.0, 1.0)
 	)
@@ -490,7 +493,7 @@ func align_to_surface(gravity_up: Vector3, delta: float) -> void:
 		rotation_amount
 	)
 
-	# Apply the rotation and remove small numerical distortions from the basis.
+	# Keep the basis orthonormal after rotating.
 	global_transform.basis = (
 		Basis(rotation_quaternion) * current_basis
 	).orthonormalized()
