@@ -107,7 +107,7 @@ mouse_filter = 2
 script = ExtResource("1_h5o24")
 
 [node name="Crosshair" type="AnimatedSprite2D" parent="HUD" unique_id=2090361019]
-position = Vector2(959.5, 528.5)
+position = Vector2(960, 540)
 scale = Vector2(0.5, 0.5)
 sprite_frames = SubResource("SpriteFrames_g4v7s")
 animation = &"big"

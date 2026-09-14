@@ -23,6 +23,10 @@ var health: float
 signal health_changed(current_health: float, maximum_health: float)
 signal player_ready(player: CharacterBody3D)
 
+@onready var body_mesh: CSGMesh3D = $CSGMesh3D
+var normal_color: Color
+var hit_color := Color("#ff5454")
+
 #endregion
 
 
@@ -133,6 +137,9 @@ func _ready() -> void:
 		camera.current = local_player
 
 	health = max_health
+
+	body_mesh.material = body_mesh.material.duplicate()
+	normal_color = body_mesh.material.albedo_color
 
 	# Allow the CharacterBody3D to remain attached to nearby surfaces.
 	#
@@ -532,8 +539,19 @@ func take_damage(amount: float) -> void:
 
 	print(name, " took ", amount, " damage. Health: ", health)
 
+	flash_hit.rpc()
+
 	if health <= 0.0:
 		die()
+
+
+
+@rpc("authority", "call_local", "reliable")
+func flash_hit() -> void:
+	body_mesh.material.albedo_color = hit_color
+	await get_tree().create_timer(0.08).timeout
+	body_mesh.material.albedo_color = normal_color
+
 
 func die() -> void:
 	var world := get_parent().get_parent()

@@ -5,12 +5,18 @@ extends Node3D
 
 @onready var player: CharacterBody3D = get_parent()
 
+var fire_held := false
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not player.is_multiplayer_authority():
 		return
 
-	if event.is_action_pressed("fire_weapon"):
+	if event.is_action_pressed("fire_weapon") and not fire_held:
+		fire_held = true
 		shoot()
+
+	elif event.is_action_released("fire_weapon"):
+		fire_held = false
 
 
 func shoot() -> void:
