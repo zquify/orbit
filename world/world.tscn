@@ -96,29 +96,32 @@ use_collision = true
 
 [node name="HUD" type="Control" parent="." unique_id=1568534031]
 layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
 grow_horizontal = 2
 grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 mouse_filter = 2
 script = ExtResource("1_h5o24")
+metadata/_edit_use_anchors_ = true
 
 [node name="Crosshair" type="AnimatedSprite2D" parent="HUD" unique_id=2090361019]
-position = Vector2(960, 540)
 scale = Vector2(0.5, 0.5)
 sprite_frames = SubResource("SpriteFrames_g4v7s")
 animation = &"big"
 
 [node name="RoomCode" type="Label" parent="HUD" unique_id=693810456]
-layout_mode = 1
-offset_left = 40.0
-offset_top = 40.0
-offset_right = 95.0
-offset_bottom = 63.0
+layout_mode = 0
+offset_left = -920.0
+offset_top = -500.0
+offset_right = -860.0
+offset_bottom = -477.0
 text = "ROOM5"
+metadata/_edit_use_anchors_ = true
 
 [node name="HealthBar" type="ProgressBar" parent="HUD" unique_id=84161523]
 custom_maximum_size = Vector2(1000, 1000)
@@ -126,14 +129,15 @@ layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 128.0
-offset_top = -168.0
-offset_right = 698.0
-offset_bottom = -111.0
+offset_left = -835.0
+offset_top = 394.0
+offset_right = -265.0
+offset_bottom = 451.0
 grow_vertical = 0
 step = 1.0
 value = 100.0
 show_percentage = false
+metadata/_edit_use_anchors_ = true
 
 [node name="Players" type="Node3D" parent="." unique_id=1868008137]
 
@@ -147,3 +151,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
 
 [node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=347363310]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.999109, 11.127246, 1.1921334)
+
+[node name="Marker2D" type="Marker2D" parent="." unique_id=1963206813]
+position = Vector2(960, 540)
