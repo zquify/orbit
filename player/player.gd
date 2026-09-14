@@ -12,6 +12,20 @@ extends CharacterBody3D
 ## can walk around spherical or otherwise curved gravity bodies while staying
 ## oriented to their surface.
 
+#region Combat
+
+@export_category("Combat")
+@export var max_health: float = 100.0
+@export var damage_per_shot: float = 20.0
+
+var health: float
+
+signal health_changed(current_health: float, maximum_health: float)
+signal player_ready(player: CharacterBody3D)
+
+#endregion
+
+
 #region Gravity
 
 @export_category("Gravity")
@@ -118,6 +132,8 @@ func _ready() -> void:
 	if camera:
 		camera.current = local_player
 
+	health = max_health
+
 	# Allow the CharacterBody3D to remain attached to nearby surfaces.
 	#
 	# This is especially useful for curved gravity because the floor may not
@@ -148,6 +164,9 @@ func _ready() -> void:
 		# The player is being initialized here rather than moving normally, so
 		# there is no need to gradually rotate over several frames.
 		align_to_surface(gravity_up, 1.0)
+	
+	if is_multiplayer_authority():
+		player_ready.emit(self)
 
 #endregion
 
@@ -497,5 +516,43 @@ func align_to_surface(gravity_up: Vector3, delta: float) -> void:
 	global_transform.basis = (
 		Basis(rotation_quaternion) * current_basis
 	).orthonormalized()
+
+#endregion
+
+
+#region Combat
+
+@rpc("any_peer", "call_remote", "reliable")
+func take_damage(amount: float) -> void:
+	if not is_multiplayer_authority():
+		return
+
+	health = max(health - amount, 0.0)
+	health_changed.emit(health, max_health)
+
+	print(name, " took ", amount, " damage. Health: ", health)
+
+	if health <= 0.0:
+		die()
+
+func die() -> void:
+	var world := get_parent().get_parent()
+
+	if not world.has_method("get_spawn_transform"):
+		return
+
+	global_transform = world.get_spawn_transform(int(name))
+	velocity = Vector3.ZERO
+
+	health = max_health
+	health_changed.emit(health, max_health)
+
+
+func respawn(spawn_transform: Transform3D) -> void:
+	global_transform = spawn_transform
+	velocity = Vector3.ZERO
+
+	health = max_health
+	health_changed.emit(health, max_health)
 
 #endregion

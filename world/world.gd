@@ -30,6 +30,12 @@ func spawn_player(peer_id: int) -> void:
 	player_spawner.spawn(peer_id)
 
 
+func get_spawn_transform(peer_id: int) -> Transform3D:
+	var spawn_index: int = (peer_id - 1) % spawn_points.get_child_count()
+	var spawn_point: Marker3D = spawn_points.get_child(spawn_index)
+
+	return spawn_point.global_transform
+
 func _spawn_player(peer_id: Variant) -> Node:
 	var player := PLAYER_SCENE.instantiate()
 
@@ -40,12 +46,7 @@ func _spawn_player(peer_id: Variant) -> Node:
 	# The peer that owns this player is responsible for controlling it.
 	player.set_multiplayer_authority(int(peer_id), true)
 
-	# Select a spawn point based on the peer ID.
-	var spawn_index: int = (int(peer_id) - 1) % spawn_points.get_child_count()
-	var spawn_point: Marker3D = spawn_points.get_child(spawn_index)
-
-	# Place the player at the selected spawn point.
-	player.global_transform = spawn_point.global_transform
+	player.global_transform = get_spawn_transform(int(peer_id))
 
 	return player
 

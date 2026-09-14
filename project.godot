@@ -33,6 +33,7 @@ enabled=PackedStringArray("res://addons/nodetunnel/plugin.cfg")
 [global_group]
 
 gravity_body=""
+player=""
 
 [input]
 
@@ -166,3 +167,4 @@ common/physics_interpolation=true
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+textures/vram_compression/import_etc2_astc=true
