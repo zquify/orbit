@@ -152,5 +152,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
 [node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=347363310]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.999109, 11.127246, 1.1921334)
 
+[node name="Spawn3" type="Marker3D" parent="SpawnPoints" unique_id=50823402]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.999, 11.127, 1.192)
+
+[node name="Spawn4" type="Marker3D" parent="SpawnPoints" unique_id=1908571542]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.192, 11.127, -9.999)
+
+[node name="Spawn5" type="Marker3D" parent="SpawnPoints" unique_id=1840670759]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.192, 11.127, 9.999)
+
 [node name="Marker2D" type="Marker2D" parent="." unique_id=1963206813]
 position = Vector2(960, 540)

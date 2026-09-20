@@ -130,6 +130,7 @@ func _ready() -> void:
 
 	camera_pivot.set_process(local_player)
 	camera_pivot.set_physics_process(local_player)
+	camera_pivot.set_process_unhandled_input(local_player)
 
 	var camera := camera_pivot.get_node_or_null("Camera3D")
 

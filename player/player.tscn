@@ -56,7 +56,7 @@ zoom_sensitivity_multiplier = 0.63
 
 [node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=417941655]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.7795031, 0.66973114, 2.2414992)
-current = true
+current = false
 fov = 80.0
 
 [node name="CameraTarget" type="Node3D" parent="." unique_id=1994388317]
