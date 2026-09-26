@@ -3,9 +3,10 @@ extends Control
 @onready var crosshair: AnimatedSprite2D = $Crosshair
 @onready var room_code: Label = $RoomCode
 @onready var health_bar: ProgressBar = $HealthBar
+@onready var stamina_bar: ProgressBar = $StaminaBar
 
 var player: CharacterBody3D
-
+var displayed_stamina: float = 100.0
 
 func _ready() -> void:
 	room_code.text = "Room Code: " + str(Network.peer.room_id)
@@ -23,6 +24,17 @@ func _process(_delta: float) -> void:
 		crosshair.animation = "small"
 	else:
 		crosshair.animation = "big"
+
+	if player != null:
+		stamina_bar.max_value = player.max_stamina
+
+		displayed_stamina = lerpf(
+			displayed_stamina,
+			player.stamina,
+			minf(1.0, 8.0 * _delta)
+		)
+		
+		stamina_bar.value = displayed_stamina
 
 
 func _find_local_player() -> void:

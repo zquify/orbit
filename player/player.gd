@@ -58,6 +58,32 @@ const VECTOR_EPSILON_SQUARED: float = 0.0001
 ## Maximum speed of the player's movement along a surface.
 @export var move_speed: float = 10.0
 
+## Maximum speed while sprinting along a surface.
+@export var sprint_speed: float = 16.0
+
+## Multiplier applied to acceleration while sprinting.
+@export var sprint_acceleration_multiplier: float = 1.5
+
+@export_category("Stamina")
+
+## Maximum stamina available.
+@export var max_stamina: float = 100.0
+
+## Stamina consumed per second while sprinting.
+@export var stamina_drain_rate: float = 25.0
+
+## Stamina recovered per second when not sprinting.
+@export var stamina_regen_rate: float = 20.0
+
+## Stamina required before sprinting can resume after exhaustion.
+@export var stamina_recovery_threshold: float = 15.0
+
+## Current stamina.
+var stamina: float = 100.0
+
+## Prevents sprinting until stamina has recovered enough.
+var stamina_exhausted: bool = false
+
 ## Rate at which the player accelerates toward the target movement speed
 ## while standing on a surface.
 @export var ground_acceleration: float = 55.0
@@ -138,6 +164,8 @@ func _ready() -> void:
 		camera.current = local_player
 
 	health = max_health
+
+	stamina = max_stamina
 
 	body_mesh.material = body_mesh.material.duplicate()
 	normal_color = body_mesh.material.albedo_color
@@ -370,9 +398,49 @@ func handle_movement(gravity_up: Vector3, delta: float) -> void:
 		acceleration = air_acceleration
 		deceleration = air_deceleration
 
+	var target_speed: float = move_speed
+
+	var sprint_held: bool = Input.is_action_pressed("sprint")
+
+	var wants_to_sprint: bool = (
+		sprint_held
+		and move_direction.length_squared() > VECTOR_EPSILON_SQUARED
+	)
+
+	var is_sprinting: bool = false
+
+	# Drain stamina while sprinting; only regenerate after sprint is released.
+	if wants_to_sprint and not stamina_exhausted:
+		stamina = maxf(
+			stamina - stamina_drain_rate * delta,
+			0.0
+		)
+
+		if stamina <= 0.0:
+			stamina_exhausted = true
+		else:
+			is_sprinting = true
+
+	elif not sprint_held:
+		stamina = minf(
+			stamina + stamina_regen_rate * delta,
+			max_stamina
+		)
+
+		if (
+			stamina_exhausted
+			and stamina >= stamina_recovery_threshold
+		):
+			stamina_exhausted = false
+
+	target_speed = move_speed
+
+	if is_sprinting:
+		target_speed = sprint_speed
+
 	if move_direction.length_squared() > VECTOR_EPSILON_SQUARED:
-		# Convert the desired direction into the target surface velocity.
-		var target_velocity: Vector3 = move_direction * move_speed
+		# Accelerate toward the desired surface velocity.
+		var target_velocity: Vector3 = move_direction * target_speed
 
 		surface_velocity = surface_velocity.move_toward(
 			target_velocity,
@@ -386,14 +454,18 @@ func handle_movement(gravity_up: Vector3, delta: float) -> void:
 		)
 
 	if is_on_floor():
-		# Only surface movement is capped.
-		#
-		# Falling, jumping, and launching can still make total velocity greater
-		# than move_speed.
 		var surface_speed: float = surface_velocity.length()
 
-		if surface_speed > move_speed:
-			surface_velocity = surface_velocity.normalized() * move_speed
+		var surface_speed_limit: float = move_speed
+
+		if Input.is_action_pressed("sprint") \
+				and move_direction.length_squared() > VECTOR_EPSILON_SQUARED:
+			surface_speed_limit = sprint_speed
+
+		if surface_speed > surface_speed_limit:
+			surface_velocity = (
+				surface_velocity.normalized() * surface_speed_limit
+			)
 
 	# Restore the gravity-direction component that was separated at the start.
 	velocity = surface_velocity + gravity_velocity
