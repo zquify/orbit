@@ -56,7 +56,7 @@ func _on_host_pressed() -> void:
 
 
 func _on_join_pressed() -> void:
-	var code := room_code.text.strip_edges()
+	var code := room_code.text.strip_edges().to_upper()
 
 	if code.is_empty():
 		status.text = "Enter a room code first."

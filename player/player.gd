@@ -64,6 +64,19 @@ const VECTOR_EPSILON_SQUARED: float = 0.0001
 ## Multiplier applied to acceleration while sprinting.
 @export var sprint_acceleration_multiplier: float = 1.5
 
+## Rate at which the player accelerates toward the target movement speed
+## while standing on a surface.
+@export var ground_acceleration: float = 55.0
+
+## Rate at which the player slows down while standing on a surface.
+@export var ground_deceleration: float = 100.0
+
+## Rate at which the player changes horizontal movement while airborne.
+@export var air_acceleration: float = 22.0
+
+## Rate at which the player loses horizontal movement while airborne.
+@export var air_deceleration: float = 10.0
+
 @export_category("Stamina")
 
 ## Maximum stamina available.
@@ -84,21 +97,71 @@ var stamina: float = 100.0
 ## Prevents sprinting until stamina has recovered enough.
 var stamina_exhausted: bool = false
 
-## Rate at which the player accelerates toward the target movement speed
-## while standing on a surface.
-@export var ground_acceleration: float = 55.0
+#endregion
 
-## Rate at which the player slows down while standing on a surface.
-@export var ground_deceleration: float = 100.0
+#region Crouching
 
-## Rate at which the player changes horizontal movement while airborne.
-@export var air_acceleration: float = 22.0
+@export_category("Crouching")
 
-## Rate at which the player loses horizontal movement while airborne.
-@export var air_deceleration: float = 10.0
+## Vertical scale of the player mesh while crouching.
+@export_range(0.1, 1.0) var crouch_scale: float = 0.6
+
+## Maximum movement speed while crouching.
+@export var crouch_speed: float = 5.0
+
+## Speed at which crouch visuals transition.
+@export var crouch_transition_speed: float = 10.0
+
+## Whether the player is currently crouching.
+var is_crouching: bool = false
 
 #endregion
 
+#region Sliding
+
+@export_category("Sliding")
+
+## Minimum surface speed required to start a slide.
+@export var slide_min_speed: float = 8.0
+
+## Additional surface speed applied when a slide starts.
+@export var slide_initial_boost: float = 2.0
+
+## Surface speed lost per second while sliding.
+@export var slide_deceleration: float = 2.0
+
+## Surface speed at which a slide ends.
+@export var slide_end_speed: float = 5.0
+
+## Backward visual tilt applied while sliding, in degrees.
+@export_range(0.0, 90.0) var slide_tilt_degrees: float = 55.0
+
+## Whether the player is currently sliding.
+var is_sliding: bool = false
+
+#endregion
+
+#region Crouch Visual State
+
+## Original scale of the player mesh.
+var standing_mesh_scale: Vector3
+
+## Original position of the player mesh.
+var standing_mesh_position: Vector3
+
+## Original rotation of the player mesh.
+var standing_mesh_rotation: Vector3
+
+## Original height of the player's capsule collider.
+var standing_collider_height: float
+
+## Original position of the player's capsule collider.
+var standing_collider_position: Vector3
+
+## Original position of the camera target.
+var standing_camera_target_position: Vector3
+
+#endregion
 
 #region Jump
 
@@ -139,11 +202,14 @@ var stamina_exhausted: bool = false
 
 #region References
 
-## Camera pivot used to determine camera-relative movement and launching.
-##
-## The camera pivot also provides the consume_yaw() function used to transfer
-## horizontal camera rotation to the player.
+## Pivot used to control the player camera.
 @onready var camera_pivot: Node3D = $CameraPivot
+
+## Target position followed by the player camera.
+@onready var camera_target: Node3D = $CameraTarget
+
+## Collision shape used for the player's physical body.
+@onready var collision_shape: CollisionShape3D = $CollisionShape3D
 
 #endregion
 
@@ -169,6 +235,17 @@ func _ready() -> void:
 
 	body_mesh.material = body_mesh.material.duplicate()
 	normal_color = body_mesh.material.albedo_color
+
+	standing_mesh_scale = body_mesh.scale
+	standing_mesh_position = body_mesh.position
+	standing_mesh_rotation = body_mesh.rotation
+	standing_camera_target_position = camera_target.position
+
+	var capsule: CapsuleShape3D = collision_shape.shape.duplicate()
+	collision_shape.shape = capsule
+
+	standing_collider_height = capsule.height
+	standing_collider_position = collision_shape.position
 
 	# Allow the CharacterBody3D to remain attached to nearby surfaces.
 	#
@@ -240,6 +317,7 @@ func _physics_process(delta: float) -> void:
 
 	# Process player-controlled velocity.
 	handle_movement(gravity_up, delta)
+	update_crouch_visuals(delta)
 	handle_jump(gravity_up)
 	handle_launch()
 
@@ -335,14 +413,7 @@ func apply_gravity(gravity: Vector3, delta: float) -> void:
 
 #region Movement
 
-## Handles camera-relative movement while preserving gravity-direction velocity.
-##
-## Movement velocity is separated into two parts:
-## - Surface velocity: movement along the current surface.
-## - Gravity velocity: movement along the gravity axis, such as jumping or falling.
-##
-## This separation prevents walking input from interfering with vertical
-## movement.
+## Updates surface movement, sprinting, stamina, crouching, and sliding.
 func handle_movement(gravity_up: Vector3, delta: float) -> void:
 	var input_2d: Vector2 = Input.get_vector(
 		"move_left",
@@ -351,42 +422,44 @@ func handle_movement(gravity_up: Vector3, delta: float) -> void:
 		"move_forward"
 	)
 
-	# Extract the portion of velocity moving along the gravity axis.
 	var gravity_velocity: Vector3 = velocity.project(gravity_up)
-
-	# The remaining velocity lies along the surface.
 	var surface_velocity: Vector3 = velocity - gravity_velocity
 
-	# Get the camera's forward and right directions.
-	#
-	# A Node3D's forward direction is its negative Z axis.
 	var camera_forward: Vector3 = -camera_pivot.global_transform.basis.z
 	var camera_right: Vector3 = camera_pivot.global_transform.basis.x
 
-	# Project the camera directions onto the surface.
-	#
-	# This prevents forward/backward movement from pushing the player into or
-	# away from the gravity body when standing on a curved surface.
 	camera_forward = camera_forward.slide(gravity_up)
 	camera_right = camera_right.slide(gravity_up)
 
-	# Normalize the projected directions so they only represent direction.
 	if camera_forward.length_squared() > VECTOR_EPSILON_SQUARED:
 		camera_forward = camera_forward.normalized()
 
 	if camera_right.length_squared() > VECTOR_EPSILON_SQUARED:
 		camera_right = camera_right.normalized()
 
-	# Convert the 2D movement input into a 3D direction relative to the camera.
 	var move_direction: Vector3 = (
-		camera_right * input_2d.x +
-		camera_forward * input_2d.y
+		camera_right * input_2d.x
+		+ camera_forward * input_2d.y
 	)
 
-	# Normalize the final direction so diagonal movement is not faster than
-	# movement in a single direction.
 	if move_direction.length_squared() > VECTOR_EPSILON_SQUARED:
 		move_direction = move_direction.normalized()
+
+	var has_movement_input: bool = (
+		move_direction.length_squared() > VECTOR_EPSILON_SQUARED
+	)
+
+	var sprint_held: bool = Input.is_action_pressed("sprint")
+	var crouch_held: bool = Input.is_action_pressed("crouch")
+	var surface_speed: float = surface_velocity.length()
+
+	var wants_to_sprint: bool = (
+		sprint_held
+		and has_movement_input
+		and not crouch_held
+		and not stamina_exhausted
+		and stamina > 0.0
+	)
 
 	var acceleration: float
 	var deceleration: float
@@ -398,77 +471,148 @@ func handle_movement(gravity_up: Vector3, delta: float) -> void:
 		acceleration = air_acceleration
 		deceleration = air_deceleration
 
-	var target_speed: float = move_speed
+	if (
+		not is_sliding
+		and crouch_held
+		and sprint_held
+		and has_movement_input
+		and not stamina_exhausted
+		and stamina > 0.0
+		and surface_speed >= slide_min_speed
+	):
+		is_sliding = true
+		surface_velocity += surface_velocity.normalized() * slide_initial_boost
+		surface_speed = surface_velocity.length()
 
-	var sprint_held: bool = Input.is_action_pressed("sprint")
+	if is_sliding and (
+		not crouch_held
+		or surface_speed <= slide_end_speed
+	):
+		is_sliding = false
 
-	var wants_to_sprint: bool = (
-		sprint_held
-		and move_direction.length_squared() > VECTOR_EPSILON_SQUARED
-	)
+	is_crouching = crouch_held and not is_sliding
 
 	var is_sprinting: bool = false
 
-	# Drain stamina while sprinting; only regenerate after sprint is released.
-	if wants_to_sprint and not stamina_exhausted:
-		stamina = maxf(
-			stamina - stamina_drain_rate * delta,
-			0.0
-		)
+	if not is_sliding:
+		if wants_to_sprint:
+			stamina = maxf(
+				stamina - stamina_drain_rate * delta,
+				0.0
+			)
 
-		if stamina <= 0.0:
-			stamina_exhausted = true
-		else:
-			is_sprinting = true
+			if stamina <= 0.0:
+				stamina_exhausted = true
+			else:
+				is_sprinting = true
 
-	elif not sprint_held:
-		stamina = minf(
-			stamina + stamina_regen_rate * delta,
-			max_stamina
-		)
+		elif not sprint_held:
+			stamina = minf(
+				stamina + stamina_regen_rate * delta,
+				max_stamina
+			)
 
-		if (
-			stamina_exhausted
-			and stamina >= stamina_recovery_threshold
-		):
-			stamina_exhausted = false
+			if (
+				stamina_exhausted
+				and stamina >= stamina_recovery_threshold
+			):
+				stamina_exhausted = false
 
-	target_speed = move_speed
+	var target_speed: float = move_speed
 
-	if is_sprinting:
+	if is_sliding:
+		target_speed = surface_speed
+	elif is_crouching:
+		target_speed = crouch_speed
+	elif is_sprinting:
 		target_speed = sprint_speed
 
-	if move_direction.length_squared() > VECTOR_EPSILON_SQUARED:
-		# Accelerate toward the desired surface velocity.
+	if is_sliding:
+		# Preserve momentum while sliding; do not drain stamina.
+		surface_velocity = surface_velocity.move_toward(
+			Vector3.ZERO,
+			slide_deceleration * delta
+		)
+
+	elif has_movement_input:
 		var target_velocity: Vector3 = move_direction * target_speed
+		var movement_acceleration: float = acceleration
+
+		if is_sprinting:
+			movement_acceleration *= sprint_acceleration_multiplier
 
 		surface_velocity = surface_velocity.move_toward(
 			target_velocity,
-			acceleration * delta
+			movement_acceleration * delta
 		)
+
 	else:
-		# No movement input means the player gradually slows down.
 		surface_velocity = surface_velocity.move_toward(
 			Vector3.ZERO,
 			deceleration * delta
 		)
 
 	if is_on_floor():
-		var surface_speed: float = surface_velocity.length()
-
+		var current_surface_speed: float = surface_velocity.length()
 		var surface_speed_limit: float = move_speed
 
-		if Input.is_action_pressed("sprint") \
-				and move_direction.length_squared() > VECTOR_EPSILON_SQUARED:
+		if is_sliding:
+			surface_speed_limit = maxf(
+				sprint_speed,
+				slide_min_speed + slide_initial_boost
+			)
+		elif is_sprinting:
 			surface_speed_limit = sprint_speed
+		elif is_crouching:
+			surface_speed_limit = crouch_speed
 
-		if surface_speed > surface_speed_limit:
+		if current_surface_speed > surface_speed_limit:
 			surface_velocity = (
 				surface_velocity.normalized() * surface_speed_limit
 			)
 
-	# Restore the gravity-direction component that was separated at the start.
 	velocity = surface_velocity + gravity_velocity
+
+
+#endregion
+
+#region Crouching
+
+## Smoothly updates the mesh and camera target for crouching and sliding.
+func update_crouch_visuals(delta: float) -> void:
+	var target_scale: Vector3 = standing_mesh_scale
+	var target_position: Vector3 = standing_mesh_position
+	var target_rotation: Vector3 = standing_mesh_rotation
+	var target_camera_position: Vector3 = standing_camera_target_position
+
+	if is_crouching:
+		target_scale.y *= crouch_scale
+		target_position.y = standing_mesh_position.y * crouch_scale
+		target_camera_position.y *= crouch_scale
+
+		var capsule: CapsuleShape3D = collision_shape.shape
+		capsule.height = standing_collider_height * crouch_scale
+		collision_shape.position.y = (
+			standing_collider_position.y * crouch_scale
+		)
+	else:
+		var capsule: CapsuleShape3D = collision_shape.shape
+		capsule.height = standing_collider_height
+		collision_shape.position = standing_collider_position
+
+	if is_sliding:
+		target_rotation.x += deg_to_rad(slide_tilt_degrees)
+
+	var weight: float = 1.0 - exp(-crouch_transition_speed * delta)
+
+	body_mesh.scale = body_mesh.scale.lerp(target_scale, weight)
+	body_mesh.position = body_mesh.position.lerp(target_position, weight)
+	body_mesh.rotation = body_mesh.rotation.lerp(target_rotation, weight)
+
+	camera_target.position = camera_target.position.lerp(
+		target_camera_position,
+		weight
+	)
 
 #endregion
 
