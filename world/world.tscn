@@ -67,6 +67,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -90.55554, 54.11256, 56.32251
 use_collision = true
 mesh = SubResource("SphereMesh_ye4v7")
 
+[node name="AsteroidC" type="CSGMesh3D" parent="." unique_id=762660370 groups=["gravity_body"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 102.17472, 99.76471, 93.59006)
+use_collision = true
+mesh = SubResource("SphereMesh_ye4v7")
+
 [node name="Markers" type="Node3D" parent="." unique_id=2006507617]
 
 [node name="CSGBox3D" type="CSGBox3D" parent="Markers" unique_id=1858798857]
