@@ -86,6 +86,34 @@ extends Node3D
 #endregion
 
 
+#region Speed FOV
+
+@export_category("Speed FOV")
+
+## Normal camera field of view in degrees.
+@export var base_fov: float = 80.0
+
+## Maximum field of view when moving at high speed.
+@export var max_speed_fov: float = 100.0
+
+## Speed at which the FOV starts increasing.
+@export var speed_threshold: float = 8.0
+
+## Speed at which the maximum FOV effect is reached.
+@export var speed_full_effect: float = 25.0
+
+## Speed at which the FOV transitions between targets.
+@export var fov_transition_speed: float = 3.0
+
+## Field of view used while zoom is held.
+@export var zoom_fov: float = 80.0
+
+## Camera3D whose field of view is adjusted.
+var camera_3d: Camera3D
+
+#endregion
+
+
 #region Camera State
 
 ## Horizontal camera rotation in radians.
@@ -121,6 +149,14 @@ func _ready() -> void:
 	# Capture the mouse so mouse movement can control the camera immediately.
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
+	# Get the Camera3D child whose field of view will be adjusted.
+	camera_3d = get_node_or_null("Camera3D") as Camera3D
+
+	# Start with the configured normal field of view.
+	if camera_3d != null:
+		camera_3d.fov = base_fov
+
+
 #endregion
 
 
@@ -131,6 +167,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	handle_controller_look(delta)
 	handle_zoom(delta)
+	handle_speed_fov(delta)
 
 	# Keep pitch inside its configured range.
 	pitch = clamp(
@@ -185,6 +222,57 @@ func update_camera_transform() -> void:
 	global_transform.basis = camera_basis
 
 	scale = current_scale
+
+#endregion
+
+
+#region Speed FOV Update
+
+## Adjusts the field of view based on movement speed.
+##
+## The speed effect is disabled while zooming so it cannot interfere
+## with the aiming view.
+func handle_speed_fov(delta: float) -> void:
+	if player == null or camera_3d == null:
+		return
+
+	# Keep the aiming view independent of movement speed.
+	if Input.is_action_pressed("zoom"):
+		camera_3d.fov = lerpf(
+			camera_3d.fov,
+			zoom_fov,
+			1.0 - exp(-fov_transition_speed * delta)
+		)
+		return
+
+	# Measure the player's current movement speed.
+	var speed: float = player.velocity.length()
+
+	# Convert speed into a value between zero and one.
+	var speed_factor: float = clampf(
+		(speed - speed_threshold)
+		/ maxf(speed_full_effect - speed_threshold, 0.001),
+		0.0,
+		1.0
+	)
+
+	# Smooth the response so the FOV doesn't change abruptly.
+	speed_factor = speed_factor * speed_factor * (
+		3.0 - 2.0 * speed_factor
+	)
+
+	# Increase the FOV gradually as speed rises.
+	var target_fov: float = lerpf(
+		base_fov,
+		max_speed_fov,
+		speed_factor
+	)
+
+	camera_3d.fov = lerpf(
+		camera_3d.fov,
+		target_fov,
+		1.0 - exp(-fov_transition_speed * delta)
+	)
 
 #endregion
 
